@@ -319,15 +319,14 @@ class Mountain(GameObject):
         super().__init__(position, color)
         self.size = size
         self.radius = size * 0.7
-        self.material = Materials.ROCK  # Matte material
-        self.snow_material = Materials.SNOW  # Glossy material
+        self.material = Materials.MATTE_GREEN  # Matte material
         
     def render(self):
         glPushMatrix()
         glTranslatef(self.position.x, self.position.y, self.position.z)
         
         self.material.apply()
-        glColor3f(0.7, 0.7, 0.75)
+        glColor3f(0.2, 0.5, 0.2)
         
         height = self.size
         base = self.size * 0.8
@@ -377,37 +376,43 @@ class Mountain(GameObject):
         # Add snow cap on top with different material
         glPushMatrix()
         glTranslatef(0, height * 0.7, 0)
-        self.snow_material.apply()  # Apply glossy snow material
-        glColor3f(0.95, 0.95, 1.0)
+
+        glMaterialfv(GL_FRONT, GL_AMBIENT, [0.2, 0.3, 0.1, 1.0])
+        glMaterialfv(GL_FRONT, GL_DIFFUSE, [0.4, 0.6, 0.2, 1.0])
+        glMaterialfv(GL_FRONT, GL_SPECULAR, [0.3, 0.4, 0.2, 1.0])
+        glMaterialf(GL_FRONT, GL_SHININESS, 16.0)
+        glColor3f(0.35, 0.55, 0.2)  # Lighter yellow-green for peak
         
-        snow_height = height * 0.3
-        snow_base = base * 0.4
-        
-        # Snow cap
+        peak_height = height * 0.3
+        peak_base = base * 0.4
+
         glBegin(GL_TRIANGLES)
         glNormal3f(0, 0.7, 0.7)
-        glVertex3f(0, snow_height, 0)
-        glVertex3f(-snow_base, 0, snow_base)
-        glVertex3f(snow_base, 0, snow_base)
+        glVertex3f(0, peak_height, 0)
+        glVertex3f(-peak_base, 0, peak_base)
+        glVertex3f(peak_base, 0, peak_base)
         
         glNormal3f(0.7, 0.7, 0)
-        glVertex3f(0, snow_height, 0)
-        glVertex3f(snow_base, 0, snow_base)
-        glVertex3f(snow_base, 0, -snow_base)
+        glVertex3f(0, peak_height, 0)
+        glVertex3f(peak_base, 0, peak_base)
+        glVertex3f(peak_base, 0, -peak_base)
         
         glNormal3f(0, 0.7, -0.7)
-        glVertex3f(0, snow_height, 0)
-        glVertex3f(snow_base, 0, -snow_base)
-        glVertex3f(-snow_base, 0, -snow_base)
+        glVertex3f(0, peak_height, 0)
+        glVertex3f(peak_base, 0, -peak_base)
+        glVertex3f(-peak_base, 0, -peak_base)
         
         glNormal3f(-0.7, 0.7, 0)
-        glVertex3f(0, snow_height, 0)
-        glVertex3f(-snow_base, 0, -snow_base)
-        glVertex3f(-snow_base, 0, snow_base)
+        glVertex3f(0, peak_height, 0)
+        glVertex3f(-peak_base, 0, -peak_base)
+        glVertex3f(-peak_base, 0, peak_base)
         glEnd()
         
         glPopMatrix()
         glPopMatrix()
+
+       
+        
 
 class Tree(GameObject):
     def __init__(self, position, color=GREEN):
@@ -1479,7 +1484,7 @@ class Game:
         pygame.init()
         pygame.font.init()
         pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.DOUBLEBUF | pygame.OPENGL)
-        pygame.display.set_caption("Arctic Tank 3D - Mini Game 2")
+        pygame.display.set_caption("Tank 3D - Mini Game 2")
         
         # Initialize fonts
         self.title_font = pygame.font.Font(None, 72)
@@ -1886,12 +1891,19 @@ class Game:
                         self.game_state = GAME_STATE_GAME_OVER
                     else:
                         self.running = False
-                elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
+                elif event.key == pygame.K_RETURN:
                     if self.game_state == GAME_STATE_INTRO:
                         self.game_state = GAME_STATE_PLAYING
                     elif self.game_state == GAME_STATE_GAME_OVER:
-                        self.__init__()  # Restart game
+                        self.__init__()  
                         self.game_state = GAME_STATE_PLAYING
+
+                
+                elif event.key == pygame.K_SPACE:
+                    laser = self.player_tank.shoot(pygame.time.get_ticks() / 1000.0)
+                    if laser:
+                        self.lasers.append(laser)
+                
                 
                 # Manual day/night selection (1-2 keys)
                 elif event.key == pygame.K_1 and self.game_state == GAME_STATE_PLAYING:
@@ -1913,69 +1925,51 @@ class Game:
             
             elif event.type == pygame.MOUSEMOTION and self.game_state == GAME_STATE_PLAYING:
                 self.mouse_x, self.mouse_y = event.pos
-            
-            elif event.type == pygame.MOUSEBUTTONDOWN and self.game_state == GAME_STATE_PLAYING:
-                if event.button == 1:  # Left click
-                    laser = self.player_tank.shoot(pygame.time.get_ticks() / 1000.0)
-                    if laser:
-                        self.lasers.append(laser)
     
     def update(self, dt):
-        # Handle player movement
         self.handle_player_input(dt)
         
-        # Update player tank
         self.player_tank.position = self.player_position
         self.player_tank.rotation.y = self.player_rotation_y
         
-        # Update camera
         self.update_camera()
-        
-        # Update game logic
+    
         self.update_game(dt)
         
-        # Update all lasers
         for laser in self.lasers:
             laser.update(dt)
         
-        # Update all enemy tanks
         for enemy in self.enemy_tanks:
             enemy.update(dt)
-            # Enemy AI shooting
-            if enemy.active and random.random() < 0.01:  # 1% chance per frame
+            if enemy.active and random.random() < 0.01:  
                 laser = enemy.shoot(pygame.time.get_ticks() / 1000.0)
                 if laser:
                     self.lasers.append(laser)
         
-        # Update explosions
         for explosion in self.explosions:
             explosion.update(dt)
         
-        # Update color spheres
         for sphere in self.color_spheres:
             sphere.update(dt)
         
-        # Update life hearts
         for heart in self.life_hearts:
             heart.update(dt)
         
-        # Check collisions
         self.check_collisions()
         
-        # Remove inactive objects
         self.lasers = [l for l in self.lasers if l.active]
         self.enemy_tanks = [e for e in self.enemy_tanks if e.active]
         self.explosions = [e for e in self.explosions if e.active]
         self.color_spheres = [s for s in self.color_spheres if s.active]
         self.life_hearts = [h for h in self.life_hearts if h.active]
-        
-        # Check game over
+
         if self.player_lives <= 0:
             self.game_state = GAME_STATE_GAME_OVER
     
     def handle_player_input(self, dt):
-        # Movement
         move_speed = self.player_tank.speed * dt
+        old_position = Vector3(self.player_position.x, self.player_position.y, self.player_position.z)
+
         
         if pygame.K_w in self.keys_pressed:
             self.player_position.x += math.sin(math.radians(self.player_rotation_y)) * move_speed
@@ -1987,11 +1981,89 @@ class Game:
             self.player_rotation_y += self.player_tank.rotation_speed * dt
         if pygame.K_d in self.keys_pressed:
             self.player_rotation_y -= self.player_tank.rotation_speed * dt
+
+        # Check collision with mountains and trees
+        collision_obj = self.check_environment_collision()
+        if collision_obj:
+            # Bounce back 
+            self.bounce_from_obstacle(old_position, collision_obj)
+            
+            # Lose a life 
+            if not hasattr(self, 'collision_cooldown'):
+                self.collision_cooldown = 0
+            
+            if self.collision_cooldown <= 0:
+                self.player_lives -= 1
+                self.collision_cooldown = 1.0  
+                self.red_flash_time = 0.3
+                self.screen_shake_time = 0.2
+               
+                self.explosions.append(Explosion(
+                    Vector3(self.player_position.x, self.player_position.y + 0.5, self.player_position.z),
+                    ORANGE
+                ))
         
-        # Keep player in bounds
+        if hasattr(self, 'collision_cooldown') and self.collision_cooldown > 0:
+            self.collision_cooldown -= dt
+        
         bound = 40
         self.player_position.x = max(-bound, min(bound, self.player_position.x))
         self.player_position.z = max(-bound, min(bound, self.player_position.z))
+    
+    def check_environment_collision(self):
+        """Check if player collides with mountains or trees"""
+
+        player_radius = self.player_tank.radius
+        
+        # Check mountains
+        for mountain in self.mountains:
+            dx = self.player_position.x - mountain.position.x
+            dz = self.player_position.z - mountain.position.z
+            dist = math.sqrt(dx*dx + dz*dz)
+            
+            # Mountain collision radius (base of mountain)
+            mountain_collision_radius = mountain.size * 0.6
+            
+            if dist < (player_radius + mountain_collision_radius):
+                return mountain
+        
+        # Check trees
+        for tree in self.trees:
+            dx = self.player_position.x - tree.position.x
+            dz = self.player_position.z - tree.position.z
+            dist = math.sqrt(dx*dx + dz*dz)
+            
+            # Tree collision radius (trunk + foliage)
+            tree_collision_radius = 0.8
+            
+            if dist < (player_radius + tree_collision_radius):
+                return tree
+        
+        return None
+    
+    def bounce_from_obstacle(self, old_position, obstacle):
+        """Bounce player away from obstacle"""
+        # Calculate direction from obstacle to player
+        dx = self.player_position.x - obstacle.position.x
+        dz = self.player_position.z - obstacle.position.z
+        dist = math.sqrt(dx*dx + dz*dz)
+        
+        if dist > 0:
+            dx /= dist
+            dz /= dist
+            
+            if isinstance(obstacle, Mountain):
+                obstacle_radius = obstacle.size * 0.6
+            else:  # Tree
+                obstacle_radius = 0.8
+            
+            push_distance = self.player_tank.radius + obstacle_radius + 0.5  # Extra 0.5 for safety
+            self.player_position.x = obstacle.position.x + dx * push_distance
+            self.player_position.z = obstacle.position.z + dz * push_distance
+        else:
+            self.player_position.x = old_position.x
+            self.player_position.z = old_position.z
+
     
     def update_intro(self, dt):
         self.intro_rotation += dt * 20
@@ -2000,8 +2072,7 @@ class Game:
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glLoadIdentity()
         
-        # Title - properly centered
-        title_text = "ARCTIC TANK 3D - MINI GAME 2"
+        title_text = "TANK 3D - MINI GAME 2"
         title_surface = self.title_font.render(title_text, True, (255, 255, 255))
         title_x = (WINDOW_WIDTH - title_surface.get_width()) // 2
         self.draw_text_2d(
@@ -2013,7 +2084,6 @@ class Game:
             padding=15
         )
         
-        # Instructions header - centered
         features_header = "User Guide:"
         header_surface = self.medium_font.render(features_header, True, (255, 255, 255))
         header_x = (WINDOW_WIDTH - header_surface.get_width()) // 2
@@ -2026,16 +2096,15 @@ class Game:
             padding=10
         )
         
-        # Feature list - centered
         features = [
             "• WASD: Move Forward/Left/Backward/Right",
             "• Mouse: Aim your tank",
-            "• Left Click: Shoot lasers at enemies",
+            "• SPACE: Shoot lasers at enemies",
             "• H: Toggle headlights ON/OFF",
             "• 1: Switch to Day mode | 2: Switch to Night mode",
             "• Collect glass spheres for +50 points",
             "• Collect life hearts for +1 life (disappear after 10 seconds)",
-            "• Destroy enemy tanks for +100 points",
+            "• Destroy enemy tanks for +25 points",
             "• Survive as long as possible!"
         ]
         
@@ -2053,8 +2122,7 @@ class Game:
             )
             y_offset += 35
         
-        # Start prompt - centered
-        start_text = "Press ENTER or SPACE to Start"
+        start_text = "Press ENTER to Start"
         start_surface = self.large_font.render(start_text, True, (255, 255, 255))
         start_x = (WINDOW_WIDTH - start_surface.get_width()) // 2
         self.draw_text_2d(
@@ -2070,54 +2138,57 @@ class Game:
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glLoadIdentity()
         
-        # Set camera
         gluLookAt(
             self.camera_pos.x, self.camera_pos.y, self.camera_pos.z,
             self.camera_target.x, self.camera_target.y, self.camera_target.z,
             0, 1, 0
         )
         
-        # Draw ground
         self.draw_ground()
         
-        # Draw direction arrows
         self.draw_direction_arrows()
+
+        glDepthMask(GL_TRUE)
+        glDisable(GL_BLEND)
         
-        # Draw environment
         for mountain in self.mountains:
+            glColor3f(1.0, 1.0, 1.0)
             mountain.render()
         
         for tree in self.trees:
             tree.render()
-        
-        for sphere in self.color_spheres:
-            if sphere.active:
-                sphere.render()
-        
-        # Draw life hearts
-        for heart in self.life_hearts:
-            if heart.active:
-                heart.render()
-        
-        # Draw player tank
+
         self.player_tank.render()
         
-        # Draw enemy tanks
+        self.player_tank.render()
+        
         for enemy in self.enemy_tanks:
             if enemy.active:
                 enemy.render()
+
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         
-        # Draw lasers
+
+        for sphere in self.color_spheres:
+            if sphere.active:
+                sphere.render()
+                glDepthMask(GL_TRUE)
+        
+        for heart in self.life_hearts:
+            if heart.active:
+                heart.render()
+
         for laser in self.lasers:
             if laser.active:
                 laser.render()
         
-        # Draw explosions
         for explosion in self.explosions:
             if explosion.active:
                 explosion.render()
         
-        # Draw HUD
+        glDepthMask(GL_TRUE)
+        glDisable(GL_BLEND)
         self.draw_hud()
     
     def render_game_over(self):
@@ -2195,7 +2266,7 @@ class Game:
                     laser.active = False
                     enemy.active = False
                     self.explosions.append(Explosion(enemy.position))
-                    self.score += 100
+                    self.score += 25
         
         # Enemy laser vs player
         for laser in self.lasers:
@@ -2224,7 +2295,7 @@ class Game:
             
             if dist < (sphere.radius + self.player_tank.radius):
                 sphere.active = False
-                self.score += 50
+                self.score += 10
         
         # Player vs life hearts
         for heart in self.life_hearts:
@@ -2237,8 +2308,7 @@ class Game:
             
             if dist < (heart.radius + self.player_tank.radius):
                 heart.active = False
-                self.player_lives += 1  # Add a life
-                self.score += 200  # Bonus points
+                self.player_lives += 1   
     
     def spawn_enemy(self):
         if len([e for e in self.enemy_tanks if e.active]) >= self.max_enemies:
@@ -2275,14 +2345,21 @@ class Game:
         self.life_hearts.append(LifeHeart(pos))
     
     def draw_ground(self):
-        """Draw ground plane with proper material"""
-        # Ground material - snow/ice
-        glMaterialfv(GL_FRONT, GL_AMBIENT, [0.7, 0.7, 0.8, 1.0])
-        glMaterialfv(GL_FRONT, GL_DIFFUSE, [0.9, 0.9, 0.95, 1.0])
-        glMaterialfv(GL_FRONT, GL_SPECULAR, [0.5, 0.5, 0.6, 1.0])
-        glMaterialf(GL_FRONT, GL_SHININESS, 32.0)
-        
-        glColor3f(0.9, 0.9, 0.95)
+        """Draw ground plane with proper material that changes with day/night"""
+        if self.time_of_day < 0.5:  # Day mode (key 1)
+            glMaterialfv(GL_FRONT, GL_AMBIENT, [0.7, 0.7, 0.8, 1.0])
+            glMaterialfv(GL_FRONT, GL_DIFFUSE, [0.9, 0.9, 0.95, 1.0])
+            glMaterialfv(GL_FRONT, GL_SPECULAR, [0.5, 0.5, 0.6, 1.0])
+            glMaterialf(GL_FRONT, GL_SHININESS, 32.0)
+            glColor3f(0.9, 0.9, 0.95) 
+            grid_color = (0.7, 0.7, 0.8, 0.3) 
+        else:  # Night mode (key 2)
+            glMaterialfv(GL_FRONT, GL_AMBIENT, [0.1, 0.1, 0.2, 1.0])
+            glMaterialfv(GL_FRONT, GL_DIFFUSE, [0.2, 0.25, 0.4, 1.0])
+            glMaterialfv(GL_FRONT, GL_SPECULAR, [0.3, 0.3, 0.5, 1.0])
+            glMaterialf(GL_FRONT, GL_SHININESS, 64.0) 
+            glColor3f(0.15, 0.18, 0.3)  
+            grid_color = (0.3, 0.4, 0.6, 0.2)  
         
         size = 100
         glBegin(GL_QUADS)
@@ -2295,7 +2372,7 @@ class Game:
         
         # Draw grid lines for visual reference
         glDisable(GL_LIGHTING)
-        glColor4f(0.7, 0.7, 0.8, 0.3)
+        glColor4f(*grid_color)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         
@@ -2310,13 +2387,10 @@ class Game:
         glEnd()
         
         glEnable(GL_LIGHTING)
-    
     def draw_direction_arrows(self):
         """Draw circular D-pad style directional indicator in bottom-right corner"""
-        # Save current OpenGL state
         glPushAttrib(GL_ENABLE_BIT | GL_LINE_BIT | GL_CURRENT_BIT)
         
-        # Switch to 2D mode
         glMatrixMode(GL_PROJECTION)
         glPushMatrix()
         glLoadIdentity()
@@ -2331,11 +2405,9 @@ class Game:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         
-        # Position in bottom-left corner
         center_x = 100
         center_y = WINDOW_HEIGHT - 100
         
-        # Draw outer circle
         circle_radius = 60
         segments = 32
         glColor4f(0.3, 0.7, 1.0, 0.5)
@@ -2348,7 +2420,6 @@ class Game:
             glVertex2f(x, y)
         glEnd()
         
-        # Draw inner circle
         inner_radius = 35
         glColor4f(0.3, 0.7, 1.0, 0.4)
         glBegin(GL_LINE_LOOP)
@@ -2359,7 +2430,6 @@ class Game:
             glVertex2f(x, y)
         glEnd()
         
-        # Draw center circle (filled)
         glColor4f(0.3, 0.7, 1.0, 0.6)
         glBegin(GL_TRIANGLE_FAN)
         glVertex2f(center_x, center_y)
@@ -2370,17 +2440,14 @@ class Game:
             glVertex2f(x, y)
         glEnd()
         
-        # Draw 4 directional arrows (Up, Down, Left, Right)
         arrow_distance = 48
         arrow_size = 15
         
-        # Check which keys are pressed
         w_pressed = pygame.K_w in self.keys_pressed
         s_pressed = pygame.K_s in self.keys_pressed
         a_pressed = pygame.K_a in self.keys_pressed
         d_pressed = pygame.K_d in self.keys_pressed
         
-        # Arrow directions: Up(270°), Right(0°), Down(90°), Left(180°)
         # Map to WASD: W=Up, D=Right, S=Down, A=Left
         directions_keys = [
             (270, w_pressed),   # Up - W key
@@ -2394,15 +2461,12 @@ class Game:
             arrow_x = center_x + arrow_distance * math.cos(angle_rad)
             arrow_y = center_y + arrow_distance * math.sin(angle_rad)
             
-            # Highlight arrow if corresponding key is pressed
             if is_pressed:
-                glColor4f(0.2, 1.0, 0.3, 0.95)  # Bright green when pressed
+                glColor4f(0.2, 1.0, 0.3, 0.95) 
             else:
-                glColor4f(0.5, 0.8, 1.0, 0.7)  # Light blue when not pressed
+                glColor4f(0.5, 0.8, 1.0, 0.7)  
             
-            # Draw arrow pointing outward from center
             glBegin(GL_TRIANGLES)
-            # Calculate arrow vertices pointing in the direction
             tip_x = arrow_x + arrow_size * math.cos(angle_rad)
             tip_y = arrow_y + arrow_size * math.sin(angle_rad)
             
@@ -2437,13 +2501,11 @@ class Game:
             glVertex2f(shaft_end_x + offset_x, shaft_end_y + offset_y)
             glEnd()
         
-        # Restore OpenGL state - CRITICAL!
         glPopMatrix()
         glMatrixMode(GL_PROJECTION)
         glPopMatrix()
         glMatrixMode(GL_MODELVIEW)
         
-        # Restore all GL states
         glPopAttrib()
 
 if __name__ == "__main__":
