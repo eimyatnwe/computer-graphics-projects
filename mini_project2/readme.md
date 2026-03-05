@@ -50,7 +50,7 @@ A 3D tank battle game built with Python, Pygame, and OpenGL featuring advanced l
 | `S` | Move backward |
 | `A` | Rotate left |
 | `D` | Rotate right |
-| `Click SPACE BAR` | Shoot laser |
+| `SPACE BAR` | Shoot laser |
 | `H` | Toggle headlights ON/OFF |
 | `1` | Switch to Day mode |
 | `2` | Switch to Night mode |
